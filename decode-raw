@@ -1,0 +1,50 @@
+
+public void parseRawDataHex() throws InvalidProtocolBufferException {
+        ApiWrapper client = ApiWrapper.ofNile("3333333333333333333333333333333333333333333333333333333333333333");
+
+        String rawDataHexString = "0a021b9822084e1c1e7428d1d7a440e0f0d5cd84325aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541b3dcf27c251da9363f1a4888257c16676cf54edf121541eca9bc828a3005b9a3b909f2cc5c2a54794de05f2244a9059cbb00000000000000000000000074178942c355dc4b88f3a43499a18e4990ed6cf7000000000000000000000000000000000000000000000000000000012a05f20070dba6d2cd843290018087a70e";
+
+        Transaction.raw trans = Transaction.raw.parseFrom(ByteArray.fromHexString(rawDataHexString));
+        System.out.println("ref_block_bytes:" +  ApiWrapper.toHex(trans.getRefBlockBytes()) +
+                "\n ref_block_hash:" + ApiWrapper.toHex(trans.getRefBlockHash()) +
+                "\n expiration:" + trans.getExpiration() +
+                "\n timestamp:" + trans.getTimestamp() +
+                "\n fee_limit:" + trans.getFeeLimit() +
+                "\n contract.type:" + trans.getContract(0).getType() );
+        Transaction.Contract contract = trans.getContract(0);
+        Any contractParameter = contract.getParameter();
+        switch (contract.getType()) {
+            case TransferContract:
+                Contract.TransferContract transferContract = contractParameter.unpack(Contract.TransferContract.class);
+                break;
+            case TriggerSmartContract:
+                TriggerSmartContract triggerSmartContract = contractParameter.unpack(TriggerSmartContract.class);
+                System.out.println("\n contract_address:" +  ApiWrapper.toHex(triggerSmartContract.getContractAddress()) +
+                        "\n owner_address:" +  ApiWrapper.toHex(triggerSmartContract.getOwnerAddress()) +
+                        "\n data:" +  ApiWrapper.toHex(triggerSmartContract.getData() ));
+
+                // decode the data filed in contract parameter
+                dataDecodingTutorial(ApiWrapper.toHex(triggerSmartContract.getData()));
+                break;
+            default:
+                break;
+        }
+
+    }
+
+    public void dataDecodingTutorial(String DATA) {
+        String rawSignature = DATA.substring(0,8);
+
+        String functionSignatureExample = "transfer(address,uint256)"; //function signature
+        String functionSelectorExample = Hash.sha3String(functionSignatureExample).substring(2,10); // function selector
+        if(rawSignature.equals(functionSelectorExample))
+        {
+            Address rawRecipient = TypeDecoder.decodeAddress(DATA.substring(8,72)); //recipient address
+            String recipient = rawRecipient.toString();
+            Uint256 rawAmount = TypeDecoder.decodeNumeric(DATA.substring(72,136), Uint256.class); //amount
+            BigInteger amount = rawAmount.getValue();
+
+            System.out.println("Called function: " + functionSignatureExample);
+            System.out.println("Transfer " + amount + " to " + recipient);
+        }
+    }
